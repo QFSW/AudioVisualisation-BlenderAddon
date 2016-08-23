@@ -17,61 +17,61 @@ class AudioPanel(bpy.types.Panel):
     bl_idname = "Audio_Visualise"
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
-    bl_context = "render"
+    bl_context = "scene"
  
     def draw(self, context):
         #Displays all the settings and buttons
         layout = self.layout
-        obj = context.scene
+        Scene = context.scene
         
         layout.label("Import Options")
         row = layout.row()
-        row.prop(obj, "FileString")
+        row.prop(Scene, "FileString")
         
         layout.label("")
         layout.label("Scene Options")
         row = layout.row()
-        row.prop(obj, "FRange")
-        row.enabled=obj.VSE
+        row.prop(Scene, "FRange")
+        row.enabled=Scene.VSE
         
         layout.label("")
         layout.label("Audio Options")
         row = layout.row()
-        row.prop(obj, "SFrame")
-        row.prop(obj, "VSE")
+        row.prop(Scene, "SFrame")
+        row.prop(Scene, "VSE")
         
         row = layout.row()
-        row.prop(obj, "AObj")
+        row.prop(Scene, "AObj")
         row.enabled=False
         
         layout.label("")
         layout.label("Generation Options")
         row = layout.row()
-        row.prop(obj, "Count")
+        row.prop(Scene, "Count")
         row.label("")
         
         row = layout.row()
-        row.prop(obj, "StepSize")
-        row.prop(obj, "StartF")
+        row.prop(Scene, "StepSize")
+        row.prop(Scene, "StartF")
         
         
         row = layout.row()
-        row.prop(obj,"SPos")
+        row.prop(Scene,"SPos")
         
         row = layout.row()
-        row.prop(obj,"DPos")
+        row.prop(Scene,"DPos")
         
         layout.label("")
         layout.label("Mesh Options")
         row = layout.row()
-        row.prop(obj, "Name")
-        row.prop(obj, "Index")
+        row.prop(Scene, "Name")
+        row.prop(Scene, "Index")
         row = layout.row()
-        row.prop(obj,"Scale")
+        row.prop(Scene,"Scale")
         row = layout.row()
-        row.prop(obj, "Origin")
+        row.prop(Scene, "Origin")
         row = layout.row()
-        row.prop(obj, "ScaleLock")
+        row.prop(Scene, "ScaleLock")
         
         layout.label("")
         layout.operator("audio.visualise")
@@ -83,31 +83,36 @@ class GenerateVisualisation(bpy.types.Operator):
 
     def execute(self, context):
         #Caches information
-        obj = context.scene
+        Scene = context.scene
         CurrentArea= bpy.context.area.type
-        obj.frame_current=obj.SFrame
+        Scene.frame_current=Scene.SFrame
+        Time=0
+        AverageTime=0
         
         #Adds the sound strip
         try:
-            if obj.VSE:
+            if Scene.VSE:
                 bpy.context.area.type = "SEQUENCE_EDITOR"
-                bpy.ops.sequencer.sound_strip_add(filepath=obj.FileString,frame_start=obj.SFrame)
+                bpy.ops.sequencer.sound_strip_add(filepath=Scene.FileString,frame_start=Scene.SFrame)
                 
-                if obj.FRange:
-                    obj.frame_end=obj.SFrame+obj.sequence_editor.sequences_all[-1].frame_final_duration
+                if Scene.FRange:
+                    Scene.frame_end=Scene.SFrame+Scene.sequence_editor.sequences_all[-1].frame_final_duration
                     
                 bpy.context.area.type = CurrentArea
             
         except:
             print("Error: Failed to add sound strip")
                 
-        XP=obj.SPos[0]
-        YP=obj.SPos[1]
-        ZP=obj.SPos[2]
+        XP=Scene.SPos[0]
+        YP=Scene.SPos[1]
+        ZP=Scene.SPos[2]
         try:
             print("\n\n")
-            for i in range(obj.Count):
-                UpdateProgress("Audio Visualisation in Progress",i/obj.Count)
+            for i in range(Scene.Count):
+                if i>0:
+                    AverageTime=(AverageTime*i+time.time()-Time)/(i+1)
+                UpdateProgress("Audio Visualisation in Progress",i/Scene.Count,AverageTime*(Scene.Count-i))
+                Time = time.time()
                 if i==0:
                     
                     #Creates Cube
@@ -117,20 +122,20 @@ class GenerateVisualisation(bpy.types.Operator):
                     #Translates Verticies
                     Vertices=Cube.data.vertices
                     for Vertex in Vertices:
-                        Vertex.co.x+=obj.Origin[0]
-                        Vertex.co.y+=obj.Origin[1]
-                        Vertex.co.z+=obj.Origin[2]
+                        Vertex.co.x+=Scene.Origin[0]
+                        Vertex.co.y+=Scene.Origin[1]
+                        Vertex.co.z+=Scene.Origin[2]
                            
                     #Scales Cube
-                    Cube.scale=obj.Scale
+                    Cube.scale=Scene.Scale
                     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
                     Cube.scale=(1,1,0)
                     
                     #Sets up animation curves
-                    py.ops.anim.keyframe_insert_menu(type = "Scaling")
-                    Cube.animation_data.action.fcurves[0].lock = not obj.ScaleLock[0];
-                    Cube.animation_data.action.fcurves[1].lock = not obj.ScaleLock[1];
-                    Cube.animation_data.action.fcurves[2].lock = not obj.ScaleLock[2];
+                    bpy.ops.anim.keyframe_insert_menu(type = "Scaling")
+                    Cube.animation_data.action.fcurves[0].lock = not Scene.ScaleLock[0];
+                    Cube.animation_data.action.fcurves[1].lock = not Scene.ScaleLock[1];
+                    Cube.animation_data.action.fcurves[2].lock = not Scene.ScaleLock[2];
     
                 else:
                     #Duplicates Mesh
@@ -139,22 +144,22 @@ class GenerateVisualisation(bpy.types.Operator):
                 
                 #Sets Object Properties
                 Cube.location=(XP,YP,ZP)
-                Cube.pass_index=obj.Index+i
-                Cube.name=obj.Name+str(i+1)
+                Cube.pass_index=Scene.Index+i
+                Cube.name=Scene.Name+str(i+1)
                 
                 try:
                     bpy.context.area.type = "GRAPH_EDITOR";
-                    bpy.ops.graph.sound_bake(filepath=obj.FileString, low=obj.StartF+(obj.StepSize*i), high=obj.StartF+(obj.StepSize*(i+1)));
+                    bpy.ops.graph.sound_bake(filepath=Scene.FileString, low=Scene.StartF+(Scene.StepSize*i), high=Scene.StartF+(Scene.StepSize*(i+1)));
                     bpy.context.area.type = CurrentArea
                 except:
                     print("Error: Unable to bake sound to curve\n\n")
                 
-                XP+=obj.DPos[0]
-                YP+=obj.DPos[1]
-                ZP+=obj.DPos[2]
+                XP+=Scene.DPos[0]
+                YP+=Scene.DPos[1]
+                ZP+=Scene.DPos[2]
             UpdateProgress("Audio Visualisation in Progress",1)
         except:
-            print("Error: Catastrophic failure")
+            raise
         return {'FINISHED'}
 
 def register():
@@ -279,10 +284,14 @@ def unregister():
     bpy.utils.unregister_module(__name__)
     
 #Updates progress to console
-def UpdateProgress(JobTitle, Progress):
+def UpdateProgress(JobTitle, Progress, TimeLeft=0):
     Length = 50
     Block = int(round(Length*Progress))
     Msg = "\r{0}: [{1}] {2}% ".format(JobTitle, "#"*Block + "-"*(Length-Block), round(Progress*100, 2))
-    if Progress >= 1: Msg += " COMPLETE\r\n"
+    if Progress >= 1: Msg += " COMPLETE              \r\n"
+    elif TimeLeft>0:
+        Minutes, Seconds = divmod(TimeLeft, 60)
+        Hours, Minutes = divmod(Minutes, 60)
+        Msg+= " %d:%02d:%02d" % (Hours, Minutes, Seconds)+" Remaining        "
     sys.stdout.write(Msg)
     sys.stdout.flush()
