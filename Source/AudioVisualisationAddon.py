@@ -72,6 +72,11 @@ class AudioPanel(bpy.types.Panel):
         row.prop(Scene, "Origin")
         row = layout.row()
         row.prop(Scene, "ScaleLock")
+        row = layout.row()
+        row.prop(Scene, "Material")
+        row = layout.row()
+        row.prop(Scene, "MaterialName")
+        row.enabled = Scene.Material
         
         layout.label("")
         layout.operator("audio.visualise")
@@ -119,7 +124,25 @@ class GenerateVisualisation(bpy.types.Operator):
                     bpy.ops.mesh.primitive_cube_add()
                     Cube=bpy.context.scene.objects.active
                     
-                    #Translates Verticies
+                    if Scene.Material:
+                        try:
+                            #Retrieves material
+                            Material = bpy.data.materials.get(Scene.MaterialName)
+                            if Material is None:
+                                #Create material if not found
+                                Material = bpy.data.materials.new(name="Material")
+                                
+                            # Assign it to object
+                            if Cube.data.materials:
+                                #Assign to 1st material slot
+                                Cube.data.materials[0] = Material
+                            else:
+                                #No slots
+                                Cube.data.materials.append(Material)
+                        except:
+                            print("Error: Assigning material failed")
+                    
+                    #Translates Vertices
                     Vertices=Cube.data.vertices
                     for Vertex in Vertices:
                         Vertex.co.x+=Scene.Origin[0]
@@ -263,6 +286,18 @@ def register():
         default = 1,
         min = 1
       )
+    bpy.types.Scene.Material = bpy.props.BoolProperty \
+      (
+        name = "Assign Material",
+        description = "Assign a material to the generated meshes",
+        default = False
+      )
+    bpy.types.Scene.MaterialName = bpy.props.StringProperty \
+      (
+        name = "Material",
+        description = "The material to assign to the generated meshes",
+        default = ""
+      )
     bpy.utils.register_module(__name__)        
 
 def unregister():
@@ -281,6 +316,8 @@ def unregister():
     del bpy.types.Scene.SFrame
     del bpy.types.Scene.ScaleLock
     del bpy.types.Scene.FRange
+    del bpy.types.Scene.Material
+    del bpy.types.Scene.MaterialName
     bpy.utils.unregister_module(__name__)
     
 #Updates progress to console
