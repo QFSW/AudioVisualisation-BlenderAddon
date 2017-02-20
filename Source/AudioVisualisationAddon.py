@@ -75,7 +75,7 @@ class AudioPanel(bpy.types.Panel):
         row = layout.row()
         row.prop(Scene, "Material")
         row = layout.row()
-        row.prop(Scene, "MaterialName")
+        row.prop_search(Scene, "MaterialName", bpy.data, "materials")
         row.enabled = Scene.Material
         
         layout.label("")
@@ -332,3 +332,6 @@ def UpdateProgress(JobTitle, Progress, TimeLeft=0):
         Msg+= " %d:%02d:%02d" % (Hours, Minutes, Seconds)+" Remaining        "
     sys.stdout.write(Msg)
     sys.stdout.flush()
+    
+if __name__ == "__main__":
+    register()
